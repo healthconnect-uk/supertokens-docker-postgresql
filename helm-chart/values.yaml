@@ -13,13 +13,15 @@ fullnameOverride: ""
 existingSecret: null
 
 database:
+  # -- database uri (connection string), used instaed of other params if not empty
+  uri: ""
   # -- database name
   name: supertokens
   # -- database port
   port: 5432
   # -- database host
   host: postgres.postgres
-  # -- database user 
+  # -- database user
   user: postgres
   # -- database password
   password: password
