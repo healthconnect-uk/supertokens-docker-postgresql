@@ -1,0 +1,16 @@
+{
+  "repository": {
+    "repositoryArn": "arn:aws:ecr:eu-west-2:867889037821:repository/supertokens-postgresql",
+    "registryId": "867889037821",
+    "repositoryName": "supertokens-postgresql",
+    "repositoryUri": "867889037821.dkr.ecr.eu-west-2.amazonaws.com/supertokens-postgresql",
+    "createdAt": "2024-06-07T06:20:14.191000+02:00",
+    "imageTagMutability": "MUTABLE",
+    "imageScanningConfiguration": {
+      "scanOnPush": false
+    },
+    "encryptionConfiguration": {
+      "encryptionType": "AES256"
+    }
+  }
+}

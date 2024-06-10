@@ -38,3 +38,4 @@ RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh # backwards compat
 EXPOSE 3567
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["supertokens", "start"]
+
