@@ -1,8 +1,8 @@
 FROM ubuntu:bionic-20200219 as tmp
 ARG PLUGIN_NAME=postgresql
 ARG PLAN_TYPE=FREE
-ARG CORE_VERSION=6.0.11
-ARG PLUGIN_VERSION=4.0.2
+ARG CORE_VERSION=9.0.2
+ARG PLUGIN_VERSION=7.0.1
 RUN apt-get update && apt-get install -y curl zip
 RUN OS= && dpkgArch="$(dpkg --print-architecture)" && \
 	case "${dpkgArch##*-}" in \
@@ -15,7 +15,7 @@ RUN OS= && dpkgArch="$(dpkg --print-architecture)" && \
 	-H "api-version: 0"
 RUN unzip supertokens.zip
 RUN cd supertokens && ./install
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 RUN groupadd supertokens && useradd -m -s /bin/bash -g supertokens supertokens
 RUN apt-get update && apt-get install -y --no-install-recommends gnupg dirmngr && rm -rf /var/lib/apt/lists/*
 ENV GOSU_VERSION 1.7
@@ -38,3 +38,4 @@ RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh # backwards compat
 EXPOSE 3567
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["supertokens", "start"]
+
