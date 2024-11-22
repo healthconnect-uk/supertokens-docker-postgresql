@@ -1,8 +1,8 @@
 FROM ubuntu:bionic-20200219 as tmp
 ARG PLUGIN_NAME=postgresql
 ARG PLAN_TYPE=FREE
-ARG CORE_VERSION=9.0.2
-ARG PLUGIN_VERSION=7.0.1
+ARG CORE_VERSION=9.3.0
+ARG PLUGIN_VERSION=7.2.0
 RUN apt-get update && apt-get install -y curl zip
 RUN OS= && dpkgArch="$(dpkg --print-architecture)" && \
 	case "${dpkgArch##*-}" in \
@@ -36,6 +36,7 @@ COPY docker-entrypoint.sh /usr/local/bin/
 RUN echo "$(md5sum /usr/lib/supertokens/config.yaml | awk '{ print $1 }')" >> /CONFIG_HASH
 RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh # backwards compat
 EXPOSE 3567
+USER "supertokens"
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["supertokens", "start"]
 

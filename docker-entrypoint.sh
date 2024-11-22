@@ -32,6 +32,8 @@ if [ "${1}" = 'dev' -o "${1}" = "production" -o "${1:0:2}" = "--" ]; then
 fi
 SUPERTOKENS_PORT=$PORT
 CONFIG_FILE=/usr/lib/supertokens/config.yaml
+TEMP_LOCATION_WHEN_READONLY=/lib/supertokens/temp/
+mkdir -p $TEMP_LOCATION_WHEN_READONLY
 CONFIG_MD5SUM="$(md5sum /usr/lib/supertokens/config.yaml | awk '{ print $1 }')"
 
 # Get the current value of DATABASE_URL
@@ -44,15 +46,23 @@ new_database_url="$(echo "$database_url" | sed 's/postgres/postgresql/')"
 export DATABASE_URL="$new_database_url"
 POSTGRESQL_CONNECTION_URI=$DATABASE_URL
 
-# if files have been shared using shared volumes, make sure the ownership of the
-# /usr/lib/supertokens files still remains with supertokens user
-# chown -R supertokens:supertokens /usr/lib/supertokens/
+# always assuming read-only
+
+#changing where the config file is written
+ORIGINAL_CONFIG=$CONFIG_FILE
+CONFIG_FILE="${TEMP_LOCATION_WHEN_READONLY}config.yaml"
+cat $ORIGINAL_CONFIG >> $CONFIG_FILE
+#required by JNA
+export _JAVA_OPTIONS=-Djava.io.tmpdir=$TEMP_LOCATION_WHEN_READONLY
+#make sure the CLI knows which config file to pass to the core
+set -- "$@" --with-config="$CONFIG_FILE" --with-temp-dir="$TEMP_LOCATION_WHEN_READONLY" --foreground
+
 
 if [ "$CONFIG_HASH" = "$CONFIG_MD5SUM" ]
 then
-
     echo "" >> $CONFIG_FILE
     echo "host: 0.0.0.0" >> $CONFIG_FILE
+    echo "postgresql_config_version: 0" >> $CONFIG_FILE
 
     # verify api keys are passed
     if [ ! -z $API_KEYS ]
@@ -236,9 +246,6 @@ then
         then
             touch $ERROR_LOG_PATH
         fi
-        # make sure supertokens user has write permission on the file
-        chown supertokens:supertokens $ERROR_LOG_PATH
-        chmod +w $ERROR_LOG_PATH
         echo "error_log_path: $ERROR_LOG_PATH" >> $CONFIG_FILE
     else
         echo "error_log_path: null" >> $CONFIG_FILE
@@ -355,15 +362,39 @@ then
         echo "supertokens_saas_load_only_cud: $SUPERTOKENS_SAAS_LOAD_ONLY_CUD" >> $CONFIG_FILE
     fi
 
+    if [ ! -z $OAUTH_PROVIDER_PUBLIC_SERVICE_URL ]
+    then
+        echo "oauth_provider_public_service_url: $OAUTH_PROVIDER_PUBLIC_SERVICE_URL" >> $CONFIG_FILE
+    fi
+
+    if [ ! -z $OAUTH_PROVIDER_ADMIN_SERVICE_URL ]
+    then
+        echo "oauth_provider_admin_service_url: $OAUTH_PROVIDER_ADMIN_SERVICE_URL" >> $CONFIG_FILE
+    fi
+
+    if [ ! -z $OAUTH_PROVIDER_CONSENT_LOGIN_BASE_URL ]
+    then
+        echo "oauth_provider_consent_login_base_url: $OAUTH_PROVIDER_CONSENT_LOGIN_BASE_URL" >> $CONFIG_FILE
+    fi
+
+    if [ ! -z $OAUTH_PROVIDER_URL_CONFIGURED_IN_OAUTH_PROVIDER ]
+    then
+        echo "oauth_provider_url_configured_in_oauth_provider: $OAUTH_PROVIDER_URL_CONFIGURED_IN_OAUTH_PROVIDER" >> $CONFIG_FILE
+    fi
+
+    if [ ! -z $OAUTH_CLIENT_SECRET_ENCRYPTION_KEY ]
+    then
+        echo "oauth_client_secret_encryption_key: $OAUTH_CLIENT_SECRET_ENCRYPTION_KEY" >> $CONFIG_FILE
+    fi
+
 fi
 
 # check if no options has been passed to docker run
 if [[ "$@" == "supertokens start" ]]
 then
-    set -- "$@" --foreground
+    set -- "$@" --with-config="$CONFIG_FILE" --foreground
 fi
 
-# Commented out because heroku does not allow running as root and we can't set the supertokens user
 # If container is started as root user, restart as dedicated supertokens user
 # if [ "$(id -u)" = "0" ] && [ "$1" = 'supertokens' ]; then
 #     exec gosu supertokens "$@"

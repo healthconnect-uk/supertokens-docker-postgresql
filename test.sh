@@ -39,6 +39,52 @@ test_session_post () {
     fi
 }
 
+test_signup_post () {
+    message=$1
+    STATUS_CODE=$(curl -X POST http://127.0.0.1:3567/recipe/signup -H "Content-Type: application/json" -d '{
+        "email": "testing@testing.test",
+        "password": "testpassword"
+    }' -o /dev/null -w '%{http_code}\n' -s)
+    if [[ $STATUS_CODE -ne "200" ]]
+    then
+        printf "\x1b[1;31merror\xd1b[0m from test_signup_post in $message\n"
+        exit 1
+    fi
+}
+
+test_signin_post () {
+    message=$1
+    STATUS_CODE=$(curl -X POST http://127.0.0.1:3567/recipe/signin -H "Content-Type: application/json" -d '{
+        "email": "testing@testing.test",
+        "password": "testpassword"
+    }' -o /dev/null -w '%{http_code}\n' -s)
+    if [[ $STATUS_CODE -ne "200" ]]
+    then
+        printf "\x1b[1;31merror\xd1b[0m from test_signin_post in $message\n"
+        exit 1
+    fi
+}
+
+test_argon2_hash_format () {
+  message=$1
+  result=$(docker exec -it postgres psql --dbname=supertokens -t -c "select password_hash from emailpassword_users where email = 'testing@testing.test'")
+  if [[ "$result" != "$argon2"* ]] # doesn't start with $argon2
+    then
+      printf "\x1b[1;31merror\xd1b[0m from test_argon2_hash_format in $message\n"
+      exit 1
+  fi
+}
+
+test_not_argon2_hash_format () {
+  message=$1
+  result=$(docker exec -it postgres psql --dbname=supertokens -t -c "select password_hash from emailpassword_users where email = 'testing@testing.test'")
+  if [[ "$result" =~ \$argon2* ]] # starts with $argon2
+    then
+      printf "\x1b[1;31merror\xd1b[0m from test_not_argon2_hash_format in $message\n"
+      exit 1
+  fi
+}
+
 no_of_containers_running_at_start=`no_of_running_containers`
 
 # start postgresql server
@@ -57,7 +103,7 @@ printf "\npostgresql_host: \"$POSTGRES_IP\"" >> $PWD/config.yaml
 
 #---------------------------------------------------
 # start with no options
-docker run -e DISABLE_TELEMETRY=true --rm -d --name supertokens supertokens-postgresql:circleci --no-in-mem-db 
+docker run -e DISABLE_TELEMETRY=true --rm -d --name supertokens supertokens-postgresql:circleci --no-in-mem-db
 
 sleep 10s
 
@@ -137,7 +183,12 @@ docker rm supertokens -f
 
 # ---------------------------------------------------
 # test info path
-docker run -e DISABLE_TELEMETRY=true $NETWORK_OPTIONS -v $PWD:/home/supertokens -e POSTGRESQL_USER=root -e POSTGRESQL_PASSWORD=root -e INFO_LOG_PATH=/home/supertokens/info.log -e ERROR_LOG_PATH=/home/supertokens/error.log --rm -d --name supertokens supertokens-postgresql:circleci --no-in-mem-db
+
+#making sure the user in the container has rights to write to the mounted volume
+mkdir $PWD/sthome
+chmod a+rw sthome
+
+docker run -e DISABLE_TELEMETRY=true $NETWORK_OPTIONS -v $PWD/sthome/:/home/supertokens -e POSTGRESQL_USER=root -e POSTGRESQL_PASSWORD=root -e INFO_LOG_PATH=/home/supertokens/info.log -e ERROR_LOG_PATH=/home/supertokens/error.log --rm -d --name supertokens supertokens-postgresql:circleci --no-in-mem-db
 
 sleep 17s
 
@@ -147,16 +198,54 @@ test_hello "test info path"
 
 test_session_post "test info path"
 
-if [[ ! -f $PWD/info.log || ! -f $PWD/error.log ]]
+if [[ ! -f $PWD/sthome/info.log || ! -f $PWD/sthome/error.log ]]
 then
     exit 1
 fi
 
 docker rm supertokens -f
 
-rm -rf $PWD/info.log
-rm -rf $PWD/error.log
 git checkout $PWD/config.yaml
+
+#---------------------------------------------------
+# test --read-only
+docker run  --read-only -e DISABLE_TELEMETRY=true $NETWORK_OPTIONS_CONNECTION_URI --tmpfs=/lib/supertokens/temp/:exec --rm -d --name supertokens supertokens-postgresql:circleci --no-in-mem-db
+
+sleep 17s
+
+test_equal `no_of_running_containers` $((no_of_containers_running_at_start+2)) "test --read-only"
+
+test_hello "test --read-only"
+
+test_session_post "test --read-only"
+
+test_signup_post "test --read-only"
+
+test_not_argon2_hash_format "test --read-only"
+
+test_signin_post "test --read-only"
+
+docker rm supertokens -f
+
+#---------------------------------------------------
+# test --read-only ARGON2
+docker run  --read-only -e DISABLE_TELEMETRY=true $NETWORK_OPTIONS_CONNECTION_URI -e PASSWORD_HASHING_ALG=ARGON2  --tmpfs=/lib/supertokens/temp/:exec --rm -d --name supertokens supertokens-postgresql:circleci --no-in-mem-db
+
+sleep 17s
+
+test_equal `no_of_running_containers` $((no_of_containers_running_at_start+2)) "test --read-only ARGON2"
+
+test_hello "test --read-only ARGON2"
+
+test_session_post "test --read-only ARGON2"
+
+test_signup_post "test --read-only ARGON2"
+
+test_argon2_hash_format "test --read-only ARGON2"
+
+test_signin_post "test --read-only ARGON2"
+
+docker rm supertokens -f
 
 docker rm postgres -f
 
