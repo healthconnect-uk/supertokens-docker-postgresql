@@ -1,9 +1,9 @@
-FROM ubuntu:bionic-20200219 as tmp
+FROM ubuntu:bionic-20230530 AS tmp
 ARG PLUGIN_NAME=postgresql
 ARG PLAN_TYPE=FREE
 ARG CORE_VERSION=9.3.0
 ARG PLUGIN_VERSION=7.2.0
-RUN apt-get update && apt-get install -y curl zip
+RUN apt-get update --fix-missing && apt-get install -y curl zip
 RUN OS= && dpkgArch="$(dpkg --print-architecture)" && \
 	case "${dpkgArch##*-}" in \
 	amd64) OS='linux';; \
@@ -18,7 +18,7 @@ RUN cd supertokens && ./install
 FROM debian:bookworm-slim
 RUN groupadd supertokens && useradd -m -s /bin/bash -g supertokens supertokens
 RUN apt-get update && apt-get install -y --no-install-recommends gnupg dirmngr && rm -rf /var/lib/apt/lists/*
-ENV GOSU_VERSION 1.7
+ENV GOSU_VERSION=1.7
 RUN set -x \
 	&& apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && rm -rf /var/lib/apt/lists/* \
 	&& wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture)" \
